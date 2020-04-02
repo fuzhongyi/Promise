@@ -131,7 +131,7 @@ function handlePromise(promise2, x, resolve, reject) {
   }
 }
 
-// Promise/A+ 测试脚本 promises-aplus-tests 所谓代码
+// Promise/A+ 测试脚本 promises-aplus-tests 所需代码
 Promise.defer = Promise.deferred = function () {
   let dfd = {};
   dfd.promise = new Promise((resolve, reject) => {
@@ -139,6 +139,89 @@ Promise.defer = Promise.deferred = function () {
     dfd.reject = reject;
   });
   return dfd;
+}
+
+Promise.resolve = function (param) {
+  if (param instanceof Promise) {
+    return param;
+  }
+  return new Promise((resolve, reject) => {
+    if (param && param.then && typeof param.then === 'function') {
+      // 为保持与原生 Promise 对象执行顺序一致，模拟使用 setTimeout
+      setTimeout(() => {
+        param.then(resolve, reject);
+      });
+    } else {
+      resolve(param);
+    }
+  });
+}
+
+Promise.reject = function (reason) {
+  return new Promise((resolve, reject) => {
+    reject(reason);
+  });
+}
+
+Promise.all = function (promises) {
+  return new Promise((resolve, reject) => {
+    let index = 0;
+    let result = [];
+    if (promises.length === 0) {
+      resolve(result);
+    } else {
+      function processValue(i, data) {
+        result[i] = data;
+        if (++index === promises.length) {
+          resolve(result);
+        }
+      }
+      for (let i = 0; i < promises.length; i++) {
+        // promises[i] 可能为普通值，使用 Promise.resolve
+        Promise.resolve(promises[i]).then((data) => {
+          processValue(i, data);
+        }, (err) => {
+          reject(err);
+          return;
+        });
+      }
+    }
+  });
+}
+
+Promise.race = function (promises) {
+  return new Promise((resolve, reject) => {
+    if (promises.length === 0) {
+      return;
+    } else {
+      for (let i = 0; i < promises.length; i++) {
+        // promises[i] 可能为普通值，使用 Promise.resolve
+        Promise.resolve(promises[i]).then((data) => {
+          resolve(data);
+          return;
+        }, (err) => {
+          reject(err);
+          return;
+        });
+      }
+    }
+  });
+}
+
+Promise.prototype.catch = function (onRejected) {
+  return this.then(null, onRejected);
+}
+
+Promise.prototype.finally = function (callback) {
+  return this.then((value) => {
+    return Promise.resolve(callback()).then(() => {
+      return value;
+    });
+  }, (err) => {
+    return Promise.resolve(callback()).then(() => {
+      throw err;
+    });
+  });
 }
 
 module.exports = Promise;
